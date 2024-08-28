@@ -1,0 +1,234 @@
+#!/usr/bin/env python2
+# -*- coding: utf-8; mode: python -*-
+#
+'''
+Downloads a file from the arm repository to the provided directory.
+
+There are several options to choose the origin (version) of the file:
+
+    - Last version of last drop.
+    - Last version of a given drop.
+    - Full url to a file.
+
+It is possible to provide a pattern that the file to download would have to match.
+
+Command line parameters
+-----------------------
+    -h, --help: flag, optional
+        Shows help.
+
+    -o, --output : str, mandatory
+        The directory where the file will be downloaded.
+
+    -u, --user-n-pass: str str, mandatory
+        User and password needed to access the arm repository.
+
+    -v, --version : str, mandatory.
+        The version of the file.
+        Allowed values: {'latest', 'drop<drop number>', '<url to a file>'}
+
+    -p, --file-pattern: str regex, optional.
+        A regex that the file must match. Ignored if --version is a full url to a file.
+        Default: 'ccsm-cli-(.+)-*.jar$',
+
+Example
+--------
+    $>  download_package_from_arm -o /tmp/my_workspace -u user_123 pass_123 -v latest
+
+        It will download from last drop in the arm repository the last version of
+        'ccsm-cli-*.jar' file into /tmp/my_workspace.
+
+    $>  download_package_from_arm -o /tmp/my_workspace -u user_123 pass_123 -v drop43
+
+        It will download from drop43 in the arm repository the last version of
+        'ccsm-cli-*.jar' file into /tmp/my_workspace
+
+    $>  download_package_from_arm -o /tmp/my_workspace -u user_123 pass_123 -v \
+        https://arm.rnd.ki.sw.ericsson.se/artifactory/proj-jcat-dev-local/com/ericsson/ccsm/
+            test/ccsm-cli/2.53.3-SNAPSHOT/ccsm-cli-2.53.3-20210427.133924-3.jar
+
+        It will download exactly the file indicated in -v parameter into /tmp/my_workspace.
+
+    $>  download_package_from_arm -o /tmp/my_workspace -u user_123 pass_123 -v drop43 \
+        -p  'ccsm-cli-(.+)-*.jar$'
+
+        It will download from last drop in the arm repository the last version of
+        'ccsm-cli-*.jar' file into /tmp/my_workspace.
+'''
+
+import argparse
+import base64
+import os
+import re
+import sys
+import traceback
+
+
+try:
+    from HTMLParser import HTMLParser
+except ImportError:
+    from html.parser import HTMLParser
+
+try:
+    import urllib2 as _urllib
+except ImportError:
+    import urllib.request as _urllib
+
+
+_TARGET_URL_RND_KI_SW = 'https://arm.rnd.ki.sw.ericsson.se/artifactory/proj-jcat-dev-local/com/' \
+    'ericsson/ccsm/test/ccsm-cli/'
+
+_TARGET_URL_SERO_GIC = 'https://arm.sero.gic.ericsson.se/artifactory/proj-jcat-dev-local/com/' \
+    'ericsson/ccsm/test/ccsm-cli/'
+
+_DIR_PATTERN = '2\.\d+\.\d+-SNAPSHOT/$'
+_DEFAULT_FILE_PATTERN = 'ccsm-cli-(.+)-.*.jar$'
+_DEFAULT_VERSION = 'latest'
+
+
+class _HTMLParser(HTMLParser):
+    _TAG_ANCHOR = 'a'
+    _HREF_ATTR = 'href'
+
+    def __init__(self, f_consider):
+        HTMLParser.__init__(self)
+
+        self._f_consider = f_consider
+        self.greatest_href_value = None
+
+    def _get_href_value(self, attrs):
+        for attr in attrs:
+            if attr[0] == self._HREF_ATTR:
+                return attr[1]
+
+    def handle_starttag(self, tag, attrs):
+        if tag == self._TAG_ANCHOR:
+            next_href_value = self._get_href_value(attrs)
+
+            if self._f_consider(next_href_value):
+                self.greatest_href_value = next_href_value \
+                    if next_href_value > self.greatest_href_value else self.greatest_href_value
+
+
+def _request_url(url, user_n_pass):
+    req = _urllib.Request(url)
+    try:
+        base64string = base64.b64encode('{}:{}'.format(user_n_pass[0], user_n_pass[1]))
+        req.add_header('Authorization', 'Basic {}'.format(base64string))
+
+        return _urllib.urlopen(req)
+    except IOError:
+        print('Error unable to access to url: {}'.format(url))
+        traceback.print_exc()
+        sys.exit(-1)
+
+
+def _download_to(url, user_n_pass, file_name):
+    res = _request_url(url, user_n_pass)
+
+    try:
+        with open(file_name, "w") as the_file:
+            the_file.write(res.read())
+    except IOError as ex:
+        print('Error unable to write the file {}. {}'.format(file_name, ex))
+        sys.exit(-1)
+
+
+def _get_element_from_html(text, func_compare):
+    parser = _HTMLParser(func_compare)
+    parser.feed(text)
+
+    return parser.greatest_href_value
+
+
+def _get_element_from_url(url, user_n_pass, func_compare):
+    req = _request_url(url, user_n_pass)
+    element = _get_element_from_html(req.read(), func_compare)
+
+    # element is never 'int'
+    if element:
+        return element
+
+    raise Warning('Expected name not found.')
+
+
+def _download_full_url(version, user_n_pass, output):
+    if not re.match('({}|{}){}'.format(_TARGET_URL_RND_KI_SW, _TARGET_URL_SERO_GIC, '.+'),
+                    version):
+        print('Error. Invalid url ({}) for repository arm. \nBase url must be one of: '
+              '({}, {})'.format(version, _TARGET_URL_RND_KI_SW, _TARGET_URL_SERO_GIC))
+        sys.exit(-1)
+
+    _download_to(version, user_n_pass, os.path.join(output, os.path.basename(version)))
+
+    print('{} downloaded to {}'.format(version, output))
+
+
+def _download_latest(user_n_pass, dir_pattern, file_pattern, output):
+    try:
+        dir_name = _get_element_from_url(_TARGET_URL_RND_KI_SW, user_n_pass,
+                                         lambda x: re.match(dir_pattern, x))
+    except Exception:
+        print('Error. Expected directory not found in url provided.')
+        traceback.print_exc()
+        sys.exit(-1)
+    try:
+        file_name = _get_element_from_url(os.path.join(_TARGET_URL_RND_KI_SW, dir_name),
+                                          user_n_pass, lambda x: re.match(file_pattern, x))
+    except Exception:
+        print('Error. Expected file not found in url provided.')
+        traceback.print_exc()
+        sys.exit(-1)
+
+    _download_to(os.path.join(_TARGET_URL_RND_KI_SW, dir_name, file_name), user_n_pass,
+                 os.path.join(output, file_name))
+
+    print('{} downloaded to {}'.format(os.path.join(_TARGET_URL_RND_KI_SW, dir_name, file_name),
+                                       output))
+
+
+def _download_drop(args):
+    drop_num = re.match('drop(\d+)$', args.version)
+
+    if drop_num:
+        _download_latest(args.user_n_pass, '\d+\.{}\.\d+-SNAPSHOT/$'.format(drop_num.group(1)),
+                         args.file_pattern, args.output)
+    else:
+        print("Error. Invalid drop value passed: '{}'. Valid format: 'drop<drop number>'. "
+              "Example: 'drop43'.".format(args.version))
+        sys.exit(-1)
+
+
+def _parse_command_line():
+    parser = argparse.ArgumentParser(description='Downloads a file from the arm repository to the '
+                                     'provided directory.')
+
+    parser.add_argument('-o', '--output', required=True,
+                        help='Directory where the file will be downloaded.')
+
+    parser.add_argument('-u', '--user-n-pass', nargs=2, metavar=('USER', 'PASSWORD'),
+                        required=True, help='User and password needed to access the arm '
+                        'repository.')
+
+    parser.add_argument('-v', '--version', required=True, help='The version of the file.'
+                        "Allowed values: {'latest', 'drop<drop number>', '<url to a file>'}.")
+
+    parser.add_argument('-p', '--file-pattern', default=_DEFAULT_FILE_PATTERN, help='A regex that '
+                        'the file must match. Ignored if --version is a full url to a file')
+
+    return parser.parse_args()
+
+
+def _main():
+    args = _parse_command_line()
+
+    if args.version.startswith('https://'):
+        _download_full_url(args.version, args.user_n_pass, args.output)
+    elif args.version == _DEFAULT_VERSION:
+        _download_latest(args.user_n_pass, _DIR_PATTERN, args.file_pattern, args.output)
+    else:
+        _download_drop(args)
+
+
+if __name__ == '__main__':
+    sys.exit(_main())

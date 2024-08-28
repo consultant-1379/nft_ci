@@ -1,0 +1,58 @@
+getPipelineResource
+-------------------
+This file contains helper common functions for the Jenkins NFT pipelines
+
+SOURCE_ROOT_DIR
+---------------
+Allow smooth transition between old "udm_nft_auto" directory and the new "nft_automation" directory
+
+ARM_CCSM_NFT_REPO
+-----------------
+Return dictionary with CCSM-NFT ARM repositories
+
+ARM_CCSM_NFT_LOGS_REPO
+----------------------
+Return CCSM-NFT ARM repositories
+
+DEFAULT_GERRIT_SERVER
+Clone repository using this mirror location
+
+getListFromSh(String cmd)
+-------------------------
+Return a list of elements compossed by the lines in a shell command output
+
+getCredentialId(String unit, String type="gerrit")
+--------------------------------------------------
+Get Jenkins credential ID
+
+formatGerritUrl(url_in)
+-----------------------
+Reformat a Gerrit URL(ssh:29418) if necesary
+
+parseTestng(tng_file)
+---------------------
+Parse a TestNG XML file to extract information about TSs, TCs and results
+
+parseJunit(junit_file)
+----------------------
+Parse a JUnit XML file to extract information about TSs, TCs and results
+
+generateResultProperties(cfg, summ)
+-----------------------------------
+Generate 'results.properties' file
+
+log(mode, msg)
+--------------
+Print log message with some stacktrace info
+
+msgError(msg)
+-------------
+Print error message with additional info and abort the build
+
+createTempLocation(String path)
+-------------------------------
+Generates a path to a temporary file location, ending with {@code path} parameter.
+
+copyGlobalLibraryScript
+-----------------------
+Returns the path to a temp location of a script from the global library (resources/ subdirectory)

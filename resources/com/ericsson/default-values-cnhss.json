@@ -1,0 +1,70 @@
+{
+    "cloud": {
+        "type"  : "com.cwctravel.hudson.plugins.extended__choice__parameter.ExtendedChoiceParameterDefinition",
+        "name"  : "CLOUD",
+        "value_description" : "seropc00018-vnf05,selipc00015-vnf01,seropc00007-vnf05,selipc00013-vnf25,seropc00002-vnf04,seropc00002-vnf20,seropc00009-vnf01",
+        "value" : "seliius20411,seliius07816,seroius05641,seliius22877,seroius07090,seroius04297,seroius04897",
+        "defaultValue" : "seliius20411",
+        "help"  : "Cluster to run in"
+    },
+    "traffic_type": {
+        "type"  : "choiceParam",
+        "name"  : "TRAFFIC_TYPE",
+        "value" : ["ST","CVE"],
+        "help"  : "ST traffic includes sync and async traffic with all cases (now run async only), CVE is for async traffic with specified cases."
+    },
+    "use_dtg_traffic": {
+        "type"  : "booleanParam",
+        "name"  : "USE_DTG_TRAFFIC",
+        "value" : false,
+        "help"  : "Use DTG traffic for HSS stability test."
+    },
+    "gtla_backup_name": {
+        "type"  : "stringParam",
+        "name"  : "GTLA_BACKUP_NAME",
+        "value" : "",
+        "help"  : "GTLA backup name. By default it will be different for DTG traffic or Titansim traffic"
+    },
+    "stability_engineering_cap": {
+        "type"  : "stringParam",
+        "name"  : "STABILITY_ENGINEERING_CAP",
+        "value" : "200",
+        "help"  : "Engineering capacity in CPS"
+    },
+        "stability_engineering_cap_async": {
+        "type"  : "stringParam",
+        "name"  : "STABILITY_ENGINEERING_CAP_ASYNC",
+        "value" : "0",
+        "help"  : "Engineering capacity in CPS for ASYNC traffic. If different to 0, the engineeringCapacity is not calculated."
+    },
+    "stability_engineering_cap_sync": {
+        "type"  : "stringParam",
+        "name"  : "STABILITY_ENGINEERING_CAP_SYNC",
+        "value" : "0",
+        "help"  : "Engineering capacity in CPS for SYNC traffic. If different to 0, the engineeringCapacity is not calculated."
+    },
+    "stability_engineering_initial_async": {
+        "type"  : "stringParam",
+        "name"  : "STABILITY_ENGINEERING_INITIAL_CPS_ASYNC",
+        "value" : "0",
+        "help"  : "Initial value in CPS to calculate the Engineering capacity for ASYNC traffic. if 0, the default values will be used."
+    },
+    "stability_engineering_initial_sync": {
+        "type"  : "stringParam",
+        "name"  : "STABILITY_ENGINEERING_INITIAL_CPS_SYNC",
+        "value" : "0",
+        "help"  : "Initial value in CPS to calculate the Engineering capacity for SYNC traffic. if 0, the default values will be used."
+    },
+    "stability_duration": {
+        "type"  : "stringParam",
+        "name"  : "STABILITY_DURATION",
+        "value" : "1",
+        "help"  : "Duration in hours for stability test"
+    },
+    "stability_error_rate": {
+        "type"  : "stringParam",
+        "name"  : "STABILITY_ERROR_RATE",
+        "value" : "0.1",
+        "help"  : "Titansim traffic Error rate threshold to pass the stability test"
+    }
+}

@@ -1,0 +1,427 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8; mode: python -*-
+#
+
+import os
+import re
+import sys
+import json
+import os.path
+import urllib
+import urllib.request
+import argparse
+from distutils.version import Version
+
+try:
+    import yaml
+except ImportError:
+    print("ERROR: python-yaml must be installed on the build node")
+    sys.exit(-1)
+
+
+PKG_RELEASE = 'RELEASE'
+PKG_LATEST = 'LATEST'
+PKG_PRERELEASE = 'PRERELEASE'
+PKG_STAGING = 'STAGING'
+PKG_SOURCE = 'SOURCE'
+REPO_RELEASE = 'release'
+REPO_DEVELOPMENT = 'development'
+REPO_STAGING = 'staging'
+LATEST_VERSION = 'LATEST'
+LATEST_PRERELEASE = 'LATEST_PRERELEASE'
+LATEST_STAGING = 'LATEST_STAGING'
+
+ALLOWED_VALUES = {
+    PKG_RELEASE: (REPO_RELEASE, LATEST_VERSION),
+    PKG_LATEST: (REPO_DEVELOPMENT, LATEST_VERSION),
+    PKG_PRERELEASE: (REPO_DEVELOPMENT, LATEST_PRERELEASE),
+    PKG_STAGING: (REPO_STAGING, LATEST_STAGING),
+    PKG_SOURCE: None,
+}
+
+REPO_DATA_CACHE = {}
+HELM_REPO = {
+    REPO_RELEASE: 'https://arm.seli.gic.ericsson.se/artifactory/proj-5g-udm-release-helm',
+    REPO_DEVELOPMENT: 'https://arm.seli.gic.ericsson.se/artifactory/proj-5g-udm-dev-helm',
+    REPO_STAGING: 'https://arm.seli.gic.ericsson.se/artifactory/proj-5g-udm-staging-helm'
+}
+NFT_REPO_URL = 'ssh://gerrit.ericsson.se:29418/HSS/CCSM/nft'
+
+CCSM_NF = 'eric-ccsm'
+SMESH_NF = 'eric-ccsm-service-mesh'
+BRANCH_SELECTOR = 'nft'
+VERSION_FORMAT = r"-[0-9]+[\.\d]*([+-].*)?"
+
+# Parsers
+def remove_prefix(value):
+    return ':'.join(value.split(':')[1:])
+
+def parse_devel_version(pkg_name):
+    return HELM_REPO[REPO_DEVELOPMENT], remove_prefix(pkg_name)
+
+def parse_release_version(pkg_name):
+    return HELM_REPO[REPO_RELEASE], remove_prefix(pkg_name)
+
+def parse_staging_version(pkg_name):
+    return HELM_REPO[REPO_STAGING], remove_prefix(pkg_name)
+
+def parse_url(url):
+    given_url = urllib.parse.urlparse(url)
+    release_url = urllib.parse.urlparse(HELM_REPO[REPO_RELEASE])
+    development_url = urllib.parse.urlparse(HELM_REPO[REPO_DEVELOPMENT])
+    staging_url = urllib.parse.urlparse(HELM_REPO[REPO_STAGING])
+    if (given_url.netloc != release_url.netloc) and (given_url.netloc != development_url.netloc):
+        print('WARNING: URL is not for ARM repository!')
+
+    item = given_url.path.split('/')[-1]
+    extension = item.split('.')[-1]
+    item_name = item[:-(1 + len(extension))]
+
+    if given_url.path.startswith(release_url.path):
+        repo_url = release_url.geturl()
+    elif given_url.path.startswith(development_url.path):
+        repo_url = development_url.geturl()
+    elif given_url.path.startswith(staging_url.path):
+        repo_url = staging_url.geturl()
+    else:
+        print('WARNING: unknown ARM repository!')
+        repo_path = '/'.join(given_url.path.split('/')[:-1])
+        repo_url = '{}://{}{}'.format(given_url.scheme, given_url.netloc, repo_path)
+
+    if item_name.startswith(SMESH_NF):
+        return repo_url, item_name[len(SMESH_NF) + 1:]
+    elif item_name.startswith(CCSM_NF):
+        return repo_url, item_name[len(CCSM_NF) + 1:]
+
+    print('WARNING: unknown NF URL')
+    package_name = re.compile(VERSION_FORMAT).sub('', item_name)
+    return repo_url, item_name[len(package_name) + 1:]
+
+
+ALLOWED_PREFIXES = {
+    'USE_DEV_VERSION:': parse_devel_version,
+    'USE_RELEASE_VERSION:': parse_release_version,
+    'USE_STAGING_VERSION:': parse_staging_version,
+    'HTTP:': parse_url,
+    'HTTPS:': parse_url
+}
+
+
+class EricVersion(Version):
+    '''
+    Class created for sorting CCSM versions (its objects can be compared so one can know which version is newer)
+    '''
+    component_re = re.compile(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?', re.VERBOSE)
+
+    def __init__ (self, vstring=None):
+        if vstring:
+            self.parse(vstring)
+
+    def parse(self, vstring):
+        components = self.component_re.match(vstring)
+        result = []
+        if components:
+            for obj in components.groups():
+                if obj is not None:
+                    try:
+                        result.append(int(obj))
+                    except ValueError as exc:
+                        pass
+        self.version = result
+
+    def __str__ (self):
+        return self.vstring
+
+    def __repr__ (self):
+        return "EricVersion ('%s')" % str(self)
+
+    def _cmp (self, other):
+        if isinstance(other, str):
+            other = EricVersion(other)
+
+        if self.version == other.version:
+            return 0
+        if self.version < other.version:
+            return -1
+        if self.version > other.version:
+            return 1
+
+
+def main():
+    '''
+    Open config YAML and parse versions
+    '''
+    user_options = parse_commandline()
+    print('Creating umbrella using: {}'.format(' '.join(sys.argv[1:])))
+
+    with open(user_options.CONFIG_FILE, 'r') as contents:
+        try:
+            original_config = yaml.load(contents, Loader=yaml.FullLoader)
+        except Exception as error:
+            print("ERROR: cannot read YAML file (%s)" % error)
+            return -1
+
+    if not isinstance(original_config, list):
+        print("ERROR: expected list of items in YAML file but found %s" % type(original_config))
+        return -1
+
+    patched_config = list()
+    for package_config in original_config:
+        package_name = package_config.get('name', 'unknown')
+        release_name = package_config['chartName']
+        if 'chartTgz' in package_config.keys():
+            print("WARNING: package %s not pointing to an ARM repository" % release_name)
+            patched_config.append(package_config)
+            continue
+
+        wanted_version = package_config.get('version', LATEST_VERSION)
+        repository = package_config['repository']
+        repo_url = repository['url']
+        repo = None
+
+        # Rewrite CCSM settings if needed
+        if release_name == CCSM_NF:
+            if user_options.ccsm_pkg.upper() == PKG_SOURCE:
+                patched_config.append(package_config)
+                continue
+            wanted_pkg = user_options.ccsm_pkg
+
+        # Rewrite Service Mesh settings if needed
+        if release_name == SMESH_NF:
+            if user_options.smesh_pkg.upper() == PKG_SOURCE:
+                patched_config.append(package_config)
+                continue
+            wanted_pkg = user_options.smesh_pkg
+
+        if release_name == BRANCH_SELECTOR:
+            # Ignore this entry (it will be re-generated)
+            continue
+
+        if release_name in [CCSM_NF, SMESH_NF]:
+            if wanted_pkg in ALLOWED_VALUES:
+                repo, wanted_version = ALLOWED_VALUES[wanted_pkg]
+                repo_url = HELM_REPO[repo]
+            elif is_prefixed_pkg(wanted_pkg):
+                prefix = wanted_pkg.split(':')[0]
+                prefix = '{}:'.format(prefix.upper())
+                repo_url, wanted_version = ALLOWED_PREFIXES[prefix](wanted_pkg)
+                if request_arm_repo(wanted_pkg) is None:
+                    print('ERROR: Package not found "{}"'.format(wanted_pkg))
+                    sys.exit(-1)
+            else:
+                print('ERROR: unknown package definition "{}"'.format(wanted_pkg))
+                sys.exit(-1)
+
+        if wanted_version in ['~1.0.0', LATEST_VERSION, LATEST_PRERELEASE, LATEST_STAGING]:
+            print('Search for version of package "{}"'.format(release_name))
+            latest_candidate, latest_precandidate = get_latest_version(repo_url, release_name)
+            if wanted_version == LATEST_PRERELEASE:
+                use_version = latest_precandidate
+            else:
+                use_version = latest_candidate
+            if not use_version:
+                print('ERROR: cannot detect desired version "{}" for package "{}"'.format(
+                    wanted_version,
+                    release_name
+                ))
+                return -1
+            print('Latest version of package {} is: {}'.format(release_name, use_version))
+            package_config['version'] = use_version
+        else:
+            use_version = wanted_version
+            print('Specified version of package {} is: {}'.format(release_name, use_version))
+
+        if release_name == CCSM_NF:
+            if repo == REPO_RELEASE:
+                if user_options.nft_branch:
+                    branch = user_options.nft_branch
+                else:
+                    try:
+                        branch = 'drop{}'.format(use_version.split('.')[1])
+                    except IndexError:
+                        branch = 'unknown'
+            else:
+                branch = user_options.nft_branch if user_options.nft_branch else 'master'
+
+        # Update config
+        repository.update({'url': str(repo_url)})
+        package_config.update({
+            'name': str(package_name),
+            'chartName': str(release_name),
+            'version': str(use_version),
+            'repository': repository
+        })
+        patched_config.append(package_config)
+
+    print(show_umbrella(patched_config))
+    if not user_options.dry_run:
+        with open(user_options.CONFIG_FILE, 'w') as contents:
+            yaml.dump(patched_config, contents, sort_keys=False)
+    else:
+        print('Dry-run selected: config file NOT patched')
+    return 0
+
+
+def parse_commandline():
+    '''
+    Read options from commandline
+    '''
+
+    def is_package_value_valid(value):
+        value = value.upper()
+        if value in ALLOWED_VALUES:
+            return True
+        for prefix in ALLOWED_PREFIXES:
+            if value.startswith(prefix):
+                return True
+        return False
+
+    parser = argparse.ArgumentParser(description='Prepare versioning config file')
+    parser.add_argument('CONFIG_FILE', action='store',
+                        help='YAML file with software installation version')
+    parser.add_argument('--ccsm-package', action='store', default=PKG_SOURCE, dest='ccsm_pkg',
+                        help='HELM repo for CCSM package')
+    parser.add_argument('--service-mesh-package', action='store', default=PKG_SOURCE, dest='smesh_pkg',
+                        help='HELM repo for Service Mesh package')
+    parser.add_argument('--nft-branch', action='store', default=None, dest='nft_branch',
+                        help='HELM repo for Service Mesh package')
+    parser.add_argument('--dry-run', action='store_true', default=False, dest='dry_run',
+                        help='Does not modify CONFIG_FILE')
+    args = parser.parse_args()
+
+    # Check original file
+    original_file = os.path.expanduser(os.path.expandvars(os.path.abspath(args.CONFIG_FILE)))
+    if not os.path.exists(original_file):
+        print("ERROR: file not found: %s" % original_file)
+        sys.exit(-1)
+    args.CONFIG_FILE = original_file
+
+    # Check package definition
+    if not is_package_value_valid(args.ccsm_pkg):
+        print("ERROR: wrong package value for CCSM: {}".format(args.ccsm_pkg))
+        sys.exit(-1)
+    if not is_package_value_valid(args.smesh_pkg):
+        print("ERROR: wrong package value for SERVICE MESH: {}".format(args.smesh_pkg))
+        sys.exit(-1)
+    return args
+
+
+def is_prefixed_pkg(pkg_value):
+    '''
+    Return if desired pkg is a prefixed value
+    '''
+    pkg_value = pkg_value.upper()
+    for prefix in ALLOWED_PREFIXES:
+        if pkg_value.startswith(prefix):
+            return True
+    return False
+
+
+def get_latest_version(repo_url, package):
+    '''
+    Connect to repo and search for the last version of release and prerelease available of package
+    '''
+
+    global REPO_DATA_CACHE
+    if repo_url not in REPO_DATA_CACHE:
+        REPO_DATA_CACHE[repo_url] = query_arm_repo(repo_url)
+    data = REPO_DATA_CACHE[repo_url]
+    if not data:
+        return None
+    precandidates = []
+    candidates = []
+    for item in data:
+        if item.get('folder', True):
+            continue
+        file_uri = item.get('uri')[1:]
+        if not file_uri.startswith(package):
+            continue
+        file_name = file_uri[:file_uri.rindex('.')]
+
+        package_name = re.compile(VERSION_FORMAT).sub('', file_name)
+        version_tag = file_name.replace(package_name, '')
+        # Skip packages with the same root name but different package
+        if not re.match(VERSION_FORMAT, version_tag):
+            continue
+        # Skip packages wrongly named
+        if package_name != package:
+            continue
+        version = file_uri[len(package) + 1:].split('.')[:-1]
+        version = '.'.join(version)
+        if '-' in version:
+            if not '+' in version:
+                candidates.append(version)
+        elif '+' in version:
+            candidates.append(version)
+        else:
+            precandidates.append(version)
+    precandidates.sort(key=EricVersion)
+    candidates.sort(key=EricVersion)
+    try:
+        latest_candidate = candidates[-1]
+    except IndexError:
+        latest_candidate = None
+    try:
+        latest_precandidate = precandidates[-1]
+    except IndexError:
+        latest_precandidate = None
+    return latest_candidate, latest_precandidate
+
+
+def request_arm_repo(repo):
+    '''
+    Connect to ARM and fetch repo contents
+    '''
+    for it in range(3):
+        try:
+            url = repo.replace('artifactory', 'artifactory/api/storage')
+            response = urllib.request.urlopen(url, timeout=600)
+            break
+        except urllib.error.HTTPError as exc:
+            print("ERROR: cannot fetch %s - %s" % (url, exc))
+    else:
+        return None
+    return response.read()
+
+
+def query_arm_repo(repo):
+    '''
+    Get data from ARM response
+    '''
+    data = request_arm_repo(repo)
+    result = json.loads(data).get('children', None)
+    return result
+
+
+def show_umbrella(info):
+    '''
+    Show umbrella versioning info
+    '''
+    header = '''
+==========================================================================
+ ION INFO * UMBRELLA VERSION INFO * UMBRELLA VERSION INFO * UMBRELLA VERS
+==========================================================================
+
+'''
+    body = ''
+    for package in info:
+        software_name = package.get('releaseName', 'unknown package name')
+        if 'chartTgz' in package.keys():
+            fname = package['chartTgz']
+            body += '''Package %s
+  File: %s\n\n''' % (software_name, fname)
+        else:
+            repo_config = package.get('repository', {})
+            if repo_config is None:
+                repo = 'undefined repo config'
+            else:
+                repo = repo_config.get('url', 'unknown repo config')
+            version = package.get('version', 'unknown version')
+            body += '''Package: %s (%s)
+  Repo: %s\n\n''' % (software_name, version, repo)
+    footer = '==========================================================================\n'
+    return header + body + footer
+
+
+if __name__ == '__main__':
+    sys.exit(main())

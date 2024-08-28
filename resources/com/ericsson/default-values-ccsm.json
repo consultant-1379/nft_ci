@@ -1,0 +1,360 @@
+{
+    "SOURCE_ROOT_DIR": "nft_automation",
+    "SETTINGS_XML": "ccsm-nonfunctional-testcases/src/main/resources/settings.xml",
+    "ARM_CCSM_NFT_DEV_REPO": "https://arm.lmera.ericsson.se/artifactory/proj-ccsmnft-dev-local/",
+    "ARM_CCSM_NFT_STAGING_REPO": "https://arm.lmera.ericsson.se/artifactory/proj-ccsmnft-staging-local/",
+    "ARM_CCSM_NFT_RELEASE_REPO": "https://arm.lmera.ericsson.se/artifactory/proj-ccsmnft-release-local/",
+    "ARM_CCSM_NFT_LOGS_REPO": "https://arm.lmera.ericsson.se/artifactory/proj-ccsmnftlogs-generic-local/",
+    "debug": {
+        "type"  : "booleanParam",
+        "name"  : "DEBUG",
+        "value" : false,
+        "help"  : "Activate to get more output"
+    },
+    "email": {
+        "choices": ["me", "NFT", "NFT+ST", "NFT+ST+Management"],
+        "recipients": {
+            "NFT": "elin.li@ericsson.com, beatriz.fernandez.moya.ext@ericsson.com, juan.ramirez.fernandez@ericsson.com, jesus.carmona@ericsson.com, serafin.alonso.alonso.ext@ericsson.com, miguel.angel.tinte.garcia.ext@ericsson.com",
+            "ST": "alfredo.martin@ericsson.com, amando.salgado@ericsson.com, miguel.roca@ericsson.com, vicky.zhu@ericsson.com, sandra.perez@ericsson.com, salvador.alonso.alejandre@ericsson.com",
+            "Management": "javier.marcos@ericsson.com, costa.shen@ericsson.com"
+        }
+    },
+    "links": {
+        "NFT_Automation_TCs": {
+            "pageId"   : "814408112",
+            "fileName" : "NFT_Automation_TCs.xlsx"
+        },
+        "OverloadTCs": "https://ericsson.sharepoint.com/:x:/r/sites/CCSMNFTAutomation/_layouts/15/Doc.aspx?sourcedoc=%7B5A809FF5-FFBF-4C8E-BE65-17DF5C1A49CE%7D&file=OverLoad_TCs.xlsx&action=default&mobileredirect=true",
+        "ActionPoints": "https://ericsson.sharepoint.com/:x:/r/sites/CCSMNFTAutomation/_layouts/15/Doc.aspx?sourcedoc=%7B40AB7012-2AB1-4945-AAB3-BFB85E5D5382%7D&file=CCSM%20-%20NFT%20Automation.xlsx&action=default&mobileredirect=true"
+    },
+    "udm_nft_auto_version": {
+        "type"  : "stringParam",
+        "name"  : "UDM_NFT_AUTO_VERSION",
+        "value" : "latest",
+        "help"  : "Jar package: latest, drop<drop number> or an URL to a specific jar package"
+    },
+    "nft_branch": {
+        "type"  : "stringParam",
+        "name"  : "NFT_BRANCH",
+        "value" : "master",
+        "help"  : "NFT branch for executing (proper configuration files and traffic)"
+    },
+    "cloud": {
+        "type"  : "com.cwctravel.hudson.plugins.extended__choice__parameter.ExtendedChoiceParameterDefinition",
+        "name"  : "CLOUD",
+        "value_description" : "seropc00002-vnf20,seropc00018-vnf05,seropc00007-vnf05,selipc00014-vnf17,seropc00002-vnf04,seropc00009-vnf01,selipc00014-vnf013,selipc00014-vnf01,seropc00002-vnf03,seropc00002-vnf03,seropc00007-vnf18,selipc00013-vnf25,selipc00013-vnf25,seliudmpodv-vnf06",
+        "value" : "seroius04297,seliius20411,seroius05641,seliius21543,seroius07090,seroius04897,seroius00358,seliius07816,seliius22618,seliius22494,seroius11854,seliius22877,seliius22495,seliius27561",
+        "defaultValue" : "seroius04297",
+        "help"  : "Cluster to run in"
+    },
+    "cloud_ipv6": {
+        "type"  : "com.cwctravel.hudson.plugins.extended__choice__parameter.ExtendedChoiceParameterDefinition",
+        "name"  : "CLOUD",
+        "value_description" : "seropc00018-vnf05",
+        "value" : "seliius20411",
+        "defaultValue" : "seliius20411",
+        "help"  : "Cluster to run in"
+    },
+    "cloud_kpis": {
+        "type"  : "com.cwctravel.hudson.plugins.extended__choice__parameter.ExtendedChoiceParameterDefinition",
+        "name"  : "CLOUD",
+        "value_description" : "eccd-capo-udm10622",
+        "value" : "seroius00358",
+        "defaultValue" : "seroius00358",
+        "help"  : "Cluster to run in"
+    },
+    "environment_name": {
+        "type"  : "stringParam",
+        "name"  : "ENVIRONMENT_NAME",
+        "value" : "AUTO",
+        "help"  : "Environment name of the CLOUD node"
+    },
+    "build_node": {
+        "type"  : "stringParam",
+        "name"  : "BUILD_NODE",
+        "value" : "AUTO",
+        "help"  : "TG node of the environment"
+    },
+    "ccsm_package": {
+        "type"  : "stringParam",
+        "name"  : "CCSM_PACKAGE",
+        "value" : "RELEASE",
+        "help"  : "RELEASE, LATEST, PRERELEASE, STAGING or an URL for CCSM package"
+    },
+    "smesh_package": {
+        "type"  : "stringParam",
+        "name"  : "SMESH_PACKAGE",
+        "value" : "RELEASE",
+        "help"  : "RELEASE, LATEST, PRERELEASE, STAGING or an URL for Service Mesh package"
+    },
+    "small_deployment": {
+        "type"  : "booleanParam",
+        "name"  : "SMALL_DEPLOYMENT",
+        "value" : false,
+        "help"  : "Deployment with Small flavor."
+    },
+    "uninstall_tools": {
+        "type"  : "booleanParam",
+        "name"  : "UNINSTALL_TOOLS",
+        "value" : false,
+        "help"  : "Uninstall tools when cleanup."
+    },
+    "ipv6": {
+        "type"  : "booleanParam",
+        "name"  : "IPV6",
+        "value" : false,
+        "help"  : "In case of DualStack cluster"
+    },
+    "mtls": {
+        "type"  : "booleanParam",
+        "name"  : "ENABLE_MTLS",
+        "value" : true,
+        "help"  : "Connections using mTLS only"
+    },
+    "dtg_version": {
+        "type"  : "stringParam",
+        "name"  : "DTG_VERSION",
+        "value" : "",
+        "help"  : "Version of DTG server release to use. Leave empty for using default."
+    },
+    "simu_traffic_enabled": {
+        "type"  : "booleanParam",
+        "name"  : "SIMU_TRAFFIC_ENABLED",
+        "value" : false,
+        "help"  : "Deployment with MAP traffic from SIMU activated. Set by default to false. If set to True, make sure this env has a SIMU configured."
+    },
+    "sms_over_nas": {
+        "type"  : "booleanParam",
+        "name"  : "SMS_OVER_NAS",
+        "value" : false,
+        "help"  : "Deployment with SMSoNAS. Set by default to false. Set to true if cluster has enough resources and to test MAP traffic."
+    },
+    "is_ansi": {
+        "type"  : "booleanParam",
+        "name"  : "IS_ANSI",
+        "value" : false,
+        "help"  : "Deployment with ITU (false) or SS7 (true). WARNING: NOT SUPPORTED YET!"
+    },
+    "pre_post": {
+        "type"  : "booleanParam",
+        "name"  : "PREPOST",
+        "value" : false,
+        "help"  : "Run PRE and POST steps surrounding TC execution"
+    },
+    "run_trafficmix": {
+        "type"  : "booleanParam",
+        "name"  : "RUN_TRAFFICMIX",
+        "value" : true,
+        "help"  : "Execute a TraffixMix sample to check environment sanity"
+    },
+    "trafficmix_engineering_cap": {
+        "type"  : "stringParam",
+        "name"  : "TRAFFICMIX_ENGINEERING_CAP",
+        "value" : "600",
+        "help"  : "Engineering capacity in CPS"
+    },
+    "trafficmix_pass_rate": {
+        "type"  : "stringParam",
+        "name"  : "TRAFFICMIX_PASS_RATE",
+        "value" : "99.9",
+        "help"  : "Success rate threshold to pass the TrafficMix test"
+    },
+    "trafficmix_duration": {
+        "type"  : "stringParam",
+        "name"  : "TRAFFICMIX_DURATION",
+        "value" : "0.15",
+        "help"  : "Duration in hours for trafficmix test"
+    },
+    "run_stability": {
+        "type"  : "booleanParam",
+        "name"  : "RUN_STABILITY",
+        "value" : true,
+        "help"  : "Execute a Stability test to check environment stability"
+    },
+    "run_stability_long": {
+        "type"  : "booleanParam",
+        "name"  : "RUN_STABILITY_LONG",
+        "value" : false,
+        "help"  : "Execute a Long Stability test to check environment stability"
+    },
+    "stability_engineering_cap": {
+        "type"  : "stringParam",
+        "name"  : "STABILITY_ENGINEERING_CAP",
+        "value" : "0",
+        "help"  : "Engineering capacity in CPS. If different to 0, the engineeringCapacity is not calculated."
+    },
+    "stability_pass_rate": {
+        "type"  : "stringParam",
+        "name"  : "STABILITY_PASS_RATE",
+        "value" : "99.9",
+        "help"  : "Pass rate threshold to pass the stability test"
+    },
+    "stability_duration": {
+        "type"  : "stringParam",
+        "name"  : "STABILITY_DURATION",
+        "value" : "1",
+        "help"  : "Duration in hours for stability test"
+    },
+    "stability_long_duration": {
+        "type"  : "stringParam",
+        "name"  : "STABILITY_LONG_DURATION",
+        "value" : "8",
+        "help"  : "Duration in hours for long stability test (usual values: 8, 24, 48, 72)"
+    },
+    "stability_sample_rate": {
+        "type"  : "stringParam",
+        "name"  : "STABILITY_SAMPLE_RATE",
+        "value" : "4",
+        "help"  : "Period in minutes for stability TC checks"
+    },
+    "run_maintainability": {
+        "type"  : "booleanParam",
+        "name"  : "RUN_MAINTAINABILITY",
+        "value" : true,
+        "help"  : "Execute the Maintainability test suite"
+    },
+    "maintainability_engineering_cap": {
+        "type"  : "stringParam",
+        "name"  : "MAINTAINABILITY_ENGINEERING_CAP",
+        "value" : "540",
+        "help"  : "Engineering capacity in CPS"
+    },
+    "maintainability_pass_rate": {
+        "type"  : "stringParam",
+        "name"  : "MAINTAINABILITY_PASS_RATE",
+        "value" : "95",
+        "help"  : "Pass rate threshold to pass the maintainability tests"
+    },
+    "run_robustness": {
+        "type"  : "booleanParam",
+        "name"  : "RUN_ROBUSTNESS",
+        "value" : false,
+        "help"  : "Execute the Robustness test suite"
+    },
+    "run_podsfaults": {
+        "type"  : "booleanParam",
+        "name"  : "RUN_PODSFAULTS",
+        "value" : true,
+        "help"  : "Execute Pods Faults test cases (group of robustness test cases)"
+    },
+    "run_commonfailures": {
+        "type"  : "booleanParam",
+        "name"  : "RUN_COMMONFAILURES",
+        "value" : true,
+        "help"  : "Execute Common Failures test cases (group of robustness test cases)"
+    },
+    "robustness_engineering_cap": {
+        "type"  : "stringParam",
+        "name"  : "ROBUSTNESS_ENGINEERING_CAP",
+        "value" : "540",
+        "help"  : "Engineering capacity in CPS"
+    },
+    "robustness_pass_rate": {
+        "type"  : "stringParam",
+        "name"  : "ROBUSTNESS_PASS_RATE",
+        "value" : "95",
+        "help"  : "Pass rate threshold to pass the robustness tests"
+    },
+    "run_licenses": {
+        "type"  : "booleanParam",
+        "name"  : "RUN_LICENSES",
+        "value" : true,
+        "help"  : "Execute some licenses test cases to check environment behaviour"
+    },
+    "licenses_pass_rate": {
+        "type"  : "stringParam",
+        "name"  : "PASS_RATE",
+        "value" : "100",
+        "help"  : "Success rate threshold to pass the license tests"
+    },
+    "run_overload_tcs": {
+        "type"  : "booleanParam",
+        "name"  : "RUN_OVERLOAD_TCS",
+        "value" : false,
+        "help"  : "Execute some overload test cases to check microservices performance"
+    },
+    "kpi_threshold": {
+        "type"  : "stringParam",
+        "name"  : "KPI_THRESHOLD",
+        "value" : "0",
+        "help"  : "Threshold value for KPI validation"
+    },
+    "kpi_rate": {
+        "type"  : "stringParam",
+        "name"  : "KPI_RATE",
+        "value" : "1200",
+        "help"  : "Rate value for KPI validation"
+    },
+    "kpi_epc_rate": {
+        "type"  : "stringParam",
+        "name"  : "KPI_EPC_RATE",
+        "value" : "600",
+        "help"  : "EPC Rate value for KPI validation"
+    },
+    "kpi_storage_path": {
+        "type"  : "stringParam",
+        "name"  : "KPI_STORAGE_PATH",
+        "value" : "/proj/hss-Q423/CCSM/KPIs/",
+        "help"  : "Storage path where KPI validation result files will be stored. (/proj/hss-Q423/CCSM/KPIs/ by default)"
+    },
+    "evnfm_server_name": {
+        "type"  : "stringParam",
+        "name"  : "EVNFM_SERVER_NAME",
+        "value" : "evnfm.evnfm-5g61-5gest.seli.gic.ericsson.se",
+        "help"  : "The EVNF manager server name, for instance: evnfm.evnfm-5g61-5gest.seli.gic.ericsson.se)"
+    },
+    "csar_url": {
+        "type"  : "stringParam",
+        "name"  : "CSAR_URL",
+        "value" : "https://arm.seli.gic.ericsson.se/artifactory/proj-5g-ccsm-staging-generic-local/proj_ccsm/5g/csar/",
+        "help"  : "The URL whete the CSAR package can be found. (https://arm.seli.gic.ericsson.se/artifactory/proj-5g-ccsm-staging-generic-local/proj_ccsm/5g/csar/ by default)"
+    },
+    "csar_path": {
+        "type"  : "stringParam",
+        "name"  : "CSAR_PATH",
+        "value" : "master",
+        "help"  : "The path where the CSAR can be found. (master by default)"
+    },
+    "csar_version": {
+        "type"  : "stringParam",
+        "name"  : "CSAR_VERSION",
+        "value" : "1_31_0-2",
+        "help"  : "The CSAR package version (for instance: 1_31_0-2)"
+    },
+    "wf_ccsm_version": {
+        "type"  : "stringParam",
+        "name"  : "WF_CCSM_VERSION",
+        "value" : "1.31.0-2",
+        "help"  : "The CSAR package version (for instance: 1.31.0-2)"
+    },
+    "csar_upgrade_path": {
+        "type"  : "stringParam",
+        "name"  : "CSAR_UPGRADE_PATH",
+        "value" : "drop101",
+        "help"  : "The CSAR package path after upgrade. (for instance: drop101)"
+    },
+    "csar_upgrade_version": {
+        "type"  : "stringParam",
+        "name"  : "CSAR_UPGRADE_VERSION",
+        "value" : "1_28_6",
+        "help"  : "The CSAR package version after upgrade. (for instance: 1_28_6)"
+    },
+    "wf_ccsm_upgrade_version": {
+        "type"  : "stringParam",
+        "name"  : "WF_CCSM_UPGRADE_VERSION ",
+        "value" : "1.28.6",
+        "help"  : "The final CCSM version after upgrade. (for instance 1.28.6)"
+    },
+    "run_scaling": {
+        "type"  : "booleanParam",
+        "name"  : "RUN_SCALING",
+        "value" : false,
+        "help"  : "Execute the scaling test suite"
+    },
+    "run_update": {
+        "type"  : "booleanParam",
+        "name"  : "RUN_UPDATE",
+        "value" : false,
+        "help"  : "Execute the update test suite"
+    }
+}
